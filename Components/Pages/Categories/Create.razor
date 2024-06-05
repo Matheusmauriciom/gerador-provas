@@ -1,0 +1,168 @@
+
+@page "/questoes/create"
+
+@rendermode InteractiveServer
+@inject ApplicationDbContext Context
+@inject NavigationManager Navigation
+
+<h3>Criar Nova Questão</h3>
+
+<EditForm Model="@Model" OnSubmit="OnSubmitAsync">
+
+        <!-- Adicione a validação de entrada -->
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label for="disciplina">Disciplina:</label>
+        <select id="disciplina" @bind="Model.Disciplina">
+            <option value="">Selecione a Disciplina</option>
+            @foreach (var disciplina in Enum.GetValues(typeof(DisciplinaModels)))
+            {
+                var disciplinaFormatada = FormatDisciplina(disciplina.ToString());
+                <option value="@disciplina">@disciplinaFormatada</option>
+            }
+        </select>
+        
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Tópico</label>
+            <InputText @bind-Value="Model.Topico" class="form-control" />
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Enunciado</label>
+        <textarea @bind="Model.Enunciado" class="form-control" rows="5"></textarea>
+    </div>
+
+    <div class="mb-3">
+        @for (int i = 0; i < Math.Min(4, Model.Alternativas.Count); i++)
+        {
+            var alternativa = Model.Alternativas[i];
+            <div class="input-group mb-3">
+                <span class="input-group-text">@($"Alternativa {Convert.ToChar('A' + i)}.")</span>
+                <InputText @bind-Value="alternativa.Descricao" class="form-control" />
+                <span class="input-group-text">
+                    <input type="radio" name="alternativaCorreta" checked="@alternativa.Correta"
+                        @onchange="(() => SetCorreta(alternativa))" />
+                    Correta
+                </span>
+            </div>
+        }
+        <button type="button" class="btn btn-secondary" @onclick="AdicionarAlternativa">Adicionar Alternativa</button>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Fonte</label>
+        <InputText @bind-Value="Model.Fonte" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Imagem</label>
+        <InputFile OnChange="(e) => HandleFileUpload(e)" class="form-control" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.CaminhoImagem))
+    {
+        <img src="@Model.CaminhoImagem" alt="Imagem da Questão" class="img-fluid" />
+    }
+
+
+
+    <button type="submit" class="btn btn-success">
+        Criar
+    </button>
+    <NavLink class="btn btn-secondary" href="/categories">Cancelar</NavLink>
+</EditForm>
+
+@code {
+    public Questao Model { get; set; } = new();
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        var imageFile = e.File;
+
+        if (imageFile != null)
+        {
+            // Converta o arquivo em bytes
+            using (var stream = imageFile.OpenReadStream())
+            {
+                using (var memoryStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memoryStream);
+                    memoryStream.Position = 0; // Volte ao início do stream
+
+                    Model.Imagens.Add(new ImagemQuestao { Imagem = memoryStream.ToArray() });
+
+                    // Set the CaminhoImagem property
+                    Model.CaminhoImagem = $"data:image/png;base64,{Convert.ToBase64String(memoryStream.ToArray())}";
+                }
+            }
+        }
+    }
+
+    private string GetDisciplinaDescription(DisciplinaModels disciplina)
+    {
+        var member = typeof(DisciplinaModels).GetMember(disciplina.ToString());
+        var descriptionAttribute = member[0].GetCustomAttributes(typeof(DescriptionAttribute), false).FirstOrDefault() as
+        DescriptionAttribute;
+
+        return descriptionAttribute?.Description ?? disciplina.ToString();
+    }
+
+    public async Task OnSubmitAsync()
+    {
+        try
+        {
+            Model.DisciplinaId = (int)Model.Disciplina;
+
+            await Context.Questoes.AddAsync(Model);
+            await Context.SaveChangesAsync();
+
+            // Adicione uma mensagem de sucesso
+            Console.WriteLine("Questão criada com sucesso!");
+
+            // Limpe o modelo após o envio bem-sucedido (opcional)
+            Model = new Questao();
+        }
+        catch (Exception ex)
+        {
+            // Exiba ou registre a mensagem de erro
+            Console.WriteLine($"Erro ao salvar a questão: {ex.Message}");
+        }
+    }
+
+    private void AdicionarAlternativa()
+    {
+        Model.Alternativas.Add(new Alternativa());
+    }
+
+    private void SetCorreta(Alternativa alternativa)
+    {
+        foreach (var alt in Model.Alternativas)
+        {
+            alt.Correta = alt == alternativa;
+        }
+    }
+
+    private string FormatDisciplina(string disciplina)
+    {
+        var formattedDisciplina = disciplina.Replace("_", " ");
+
+        // Adiciona um espaço antes de cada letra maiúscula
+        for (int i = 1; i < formattedDisciplina.Length; i++)
+        {
+            if (char.IsUpper(formattedDisciplina[i]))
+            {
+                formattedDisciplina = formattedDisciplina.Insert(i, " ");
+                i++;
+            }
+        }
+
+        return formattedDisciplina;
+    }
+
+}

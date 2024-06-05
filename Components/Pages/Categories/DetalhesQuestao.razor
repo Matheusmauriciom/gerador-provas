@@ -1,0 +1,167 @@
+@page "/questoes/detalhes/{questaoId}"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject ApplicationDbContext Context
+@inject NavigationManager NavigationManager
+
+
+<h3 class="mt-4">Detalhes da Questão</h3>
+
+@if (QuestaoDetalhes != null)
+{   <p><strong>ID da Questão:</strong> @QuestaoDetalhes.Id</p>
+    <div class="container mt-4">
+        <div class="mb-3">
+            <label for="disciplina">Disciplina:</label>
+            <input id="disciplina" value="@QuestaoDetalhes.Disciplina" class="form-control" readonly />
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Tópico</label>
+                <input value="@QuestaoDetalhes.Topico" class="form-control" readonly />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Enunciado</label>
+            <textarea class="form-control" rows="5" readonly>@QuestaoDetalhes.Enunciado</textarea>
+        </div>
+
+        @if (!string.IsNullOrEmpty(QuestaoDetalhes.CaminhoImagem))
+        {
+            <div class="mb-3">
+                
+                <img src="@QuestaoDetalhes.CaminhoImagem" alt="Imagem da Questão" class="img-fluid" />
+            </div>
+        }
+
+        <div class="mb-3">
+            <label class="form-label">Fonte</label>
+            <input value="@QuestaoDetalhes.Fonte" class="form-control" readonly />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Alternativas:</label>
+            <div class="mb-3">
+                @foreach (var alternativa in QuestaoDetalhes.Alternativas)
+                {
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">@($"Alternativa {ObterLetraAlternativa(alternativa)}.")</span>
+                        <input value="@alternativa.Descricao" class="form-control" readonly />
+                        <span class="input-group-text">
+                            @if (alternativa.Correta)
+                            {
+                                <span>Correta</span>
+                            }
+                        </span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-secondary mt-3" @onclick="VoltarParaListagem">Voltar para Listagem</button>
+    </div>
+}
+else
+{
+    <p class="mt-4">Questão não encontrada.</p>
+}
+
+
+
+@code {
+    [Parameter]
+   public string QuestaoId { get; set; }
+
+    public Questao QuestaoDetalhes { get; set; }
+
+    protected override void OnInitialized()
+    {
+        CarregarDetalhesDaQuestao();
+    }
+private char ObterLetraAlternativa(Alternativa alternativa)
+{
+    int posicao = QuestaoDetalhes.Alternativas.IndexOf(alternativa);
+    return (char)('A' + posicao);
+}
+private async Task CarregarDetalhesDaQuestao()
+{
+    try
+    {
+        if (int.TryParse(QuestaoId, out int id))
+        {
+            // Carregue os detalhes da questão com base no ID convertido
+            QuestaoDetalhes = await Context.Questoes
+                .Include(q => q.Alternativas)
+                .FirstOrDefaultAsync(q => q.Id == id);
+
+            if (QuestaoDetalhes == null)
+            {
+                Console.WriteLine("Questão não encontrada no banco de dados.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Falha na conversão do ID para int.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Erro ao carregar detalhes da questão: {ex.Message}");
+    }
+}
+
+
+    private string FormatDisciplina(string disciplina)
+    {
+        var formattedDisciplina = disciplina.Replace("_", "");
+        formattedDisciplina = string.Concat(formattedDisciplina.Select((c, i) => i > 0 && char.IsUpper(c) ? " " + c.ToString() : c.ToString()));
+        return formattedDisciplina;
+    }
+
+    private void VoltarParaListagem()
+    {
+        // Redirecione de volta para a página de listagem
+        NavigationManager.NavigateTo("/questoes/listagem");
+    }
+private string FormatPropertyValue(object value)
+{
+    if (value == null)
+    {
+        return "null";
+    }
+    else if (value is List<ImagemQuestao>)
+    {
+        var imagens = (List<ImagemQuestao>)value;
+        var imgTags = imagens.Select(img => $"<img src='data:image/png;base64,{Convert.ToBase64String(img.Imagem)}' alt='Imagem'>");
+        return string.Join("<br>", imgTags);
+    }
+    else if (value is List<Alternativa>)
+    {
+        var alternativas = (List<Alternativa>)value;
+        return "Alternativas: " + string.Join(", ", alternativas.Select(alt => alt.Descricao));
+    }
+    else
+    {
+        return value.ToString();
+    }
+}
+
+
+    private string FormatDisciplinaForTable(string disciplina)
+    {
+        var formattedDisciplina = disciplina.Replace("_", "");
+
+        formattedDisciplina = string.Concat(formattedDisciplina.Select((c, i) => i > 0 && char.IsUpper(c) ? " " + c.ToString() : c.ToString()));
+
+        return formattedDisciplina;
+    }
+
+private string FormatarRespostaCorreta(List<Alternativa> alternativas)
+{
+    var respostaCorreta = alternativas.FirstOrDefault(a => a.Correta);
+    return respostaCorreta != null ? respostaCorreta.Descricao : "Não especificada";
+}
+
+
+}

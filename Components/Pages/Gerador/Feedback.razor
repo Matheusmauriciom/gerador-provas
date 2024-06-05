@@ -1,0 +1,211 @@
+@page "/feedback"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject ApplicationDbContext Context
+@inject NavigationManager NavigationManager
+@inject Concurso.Services.RespostasService RespostasService
+@using Concurso.Services
+@inject IJSRuntime JSRuntime
+
+
+
+<h3 class="mt-4">Feedback da Prova</h3>
+
+@if (QuestoesRespostasUsuario != null && QuestoesRespostasUsuario.Any())
+{   <p>Quantidade Total de Questões: @QuantidadeTotalDeQuestoes</p>
+    <p>Total de Acertos: @QuestoesRespostasUsuario.Count(q => q.RespostaCorreta)</p>
+    <p>Total de Erros: @QuestoesRespostasUsuario.Count(q => !q.RespostaCorreta)</p>
+    <p>Porcentagem de Acertos: @Math.Round(CalcularMedia(), 2)%</p>
+
+
+
+    <div class="accordion" id="accordionQuestoes">
+        @foreach (QuestaoComResposta questaoComResposta in QuestoesRespostasUsuario)
+        {
+            <div class="accordion-item">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="@($"#questaoCollapse{questaoComResposta.Questao.Id}")"
+                        aria-expanded="true" aria-controls="@($"questaoCollapse{questaoComResposta.Questao.Id}")">
+                    Questão @questaoComResposta.Questao.Id
+                    <span class="badge bg-@(questaoComResposta.RespostaCorreta ? "success" : "danger")" style="margin-left: 12px;">
+                        @(questaoComResposta.RespostaCorreta ? "Correto" : "Incorreto")
+                    </span>
+                </button>
+                <div id="@($"questaoCollapse{questaoComResposta.Questao.Id}")" class="accordion-collapse collapse" aria-labelledby="@($"questaoHeader{questaoComResposta.Questao.Id}")" data-bs-parent="#accordionQuestoes">
+                    <div class="accordion-body">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">
+                                @($"Questão {questaoComResposta.Questao.Id}")
+                            </h5>
+                        </div>
+
+                        @if (questaoComResposta.Questao != null)
+                        {
+                            <div class="container mt-4">
+                                <div class="mb-3">
+                                    <label for="disciplina">Disciplina:</label>
+                                    <input id="disciplina" value="@questaoComResposta.Questao.Disciplina" class="form-control" readonly />
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Tópico</label>
+                                        <input value="@questaoComResposta.Questao.Topico" class="form-control" readonly />
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Enunciado</label>
+                                    <textarea class="form-control" rows="5" readonly>@questaoComResposta.Questao.Enunciado</textarea>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(questaoComResposta.Questao.CaminhoImagem))
+                                {
+                                    <div class="mb-3">
+                                        <img src="@questaoComResposta.Questao.CaminhoImagem" alt="Imagem da Questão" class="img-fluid" />
+                                    </div>
+                                }
+
+                                <div class="mb-3">
+                                    <label class="form-label">Fonte</label>
+                                    <input value="@questaoComResposta.Questao.Fonte" class="form-control" readonly />
+                                </div>
+
+                             <div class="mb-3">
+                                    <label class="form-label">Alternativas:</label>
+                                    <div class="mb-3">
+                                        @foreach (var alternativa in questaoComResposta.Questao.Alternativas)
+                                        {
+                                            <div class="input-group mb-3">
+                                                <span class="input-group-text @GetAlternativaClass(alternativa, questaoComResposta)">
+                                                    @($"Alternativa {ObterLetraAlternativa(questaoComResposta.Questao, alternativa)}.")
+                                                </span>
+                                                <input value="@alternativa.Descricao" class="form-control @GetAlternativaClass(alternativa, questaoComResposta)" readonly />
+                                                <span class="input-group-text">
+                                                    @if (alternativa.Correta)
+                                                    {
+                                                        <span class="text-success">Correta</span>
+                                                    }
+                                                    else if (alternativa.Descricao == questaoComResposta.RespostaUsuario)
+                                                    {
+                                                        <span class="resposta-incorreta text-danger">Incorreta</span>
+                                                    }
+                                                </span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="mt-4">Questão não encontrada.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+  
+}
+else
+{
+    <p class="mt-4">Nenhuma questão respondida.</p>
+}
+
+<button type="button" class="btn btn-secondary mt-3" @onclick="VoltarAoGerador">Voltar ao Gerador</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+
+@code {
+    private int QuantidadeTotalDeQuestoes { get; set; }
+    private List<QuestaoComResposta> QuestoesRespostasUsuario => RespostasService.ObterRespostas(); 
+
+
+       
+ private string GetAccordionButtonClass(QuestaoComResposta questaoComResposta)
+    {
+        if (questaoComResposta.RespostaCorreta)
+        {
+            return "btn-success";
+        }
+        else
+        {
+            return "btn-danger";
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Console.WriteLine("Página inicializada");
+        QuantidadeTotalDeQuestoes = QuestoesRespostasUsuario.Count;
+    }
+   private void ReloadPage()
+    {
+        // Chama um método JavaScript para recarregar a página
+        JSRuntime.InvokeVoidAsync("location.reload");
+    }
+    private double CalcularMedia()
+    {
+        if (QuestoesRespostasUsuario != null && QuestoesRespostasUsuario.Any())
+        {
+            var acertos = QuestoesRespostasUsuario.Count(q => q.RespostaCorreta);
+            return (double)acertos / QuestoesRespostasUsuario.Count * 100;
+        }
+        return 0;
+    }
+
+private string GetAlternativaClass(Alternativa alternativa, QuestaoComResposta questaoComResposta)
+{
+    if (alternativa.Correta && questaoComResposta.RespostaCorreta)
+    {
+        return "bg-success text-white"; // Background verde para alternativa correta e selecionada corretamente
+    }
+    else if (!alternativa.Correta && alternativa.Descricao == questaoComResposta.RespostaUsuario)
+    {
+        return "bg-danger text-white"; // Background vermelho para alternativa incorreta
+    }
+    else if (alternativa.Correta)
+    {
+        return "bg-success text-white"; // Destacar a alternativa correta em verde
+    }
+    else
+    {
+        return ""; // Não aplicar classe para outras alternativas
+    }
+}
+
+    private string ObterRespostaCorreta(Questao questao)
+    {
+        var respostaCorreta = questao.Alternativas.FirstOrDefault(a => a.Correta)?.Descricao ?? "";
+        return respostaCorreta;
+    }
+
+    private void VoltarAoGerador()
+    {
+        RespostasService.Reiniciar();
+        NavigationManager.NavigateTo("/gerador-prova");
+        ReloadPage();
+    }
+
+    private char ObterLetraAlternativa(Questao questao, Alternativa alternativa)
+    {
+        if (questao.Alternativas == null)
+        {
+            // Trate o caso em que as alternativas são nulas
+            return 'A';
+        }
+
+        int posicao = questao.Alternativas.IndexOf(alternativa);
+        return (char)('A' + posicao);
+    }
+
+    private string RespostaUsuario(QuestaoComResposta questaoComResposta)
+    {
+        return questaoComResposta.RespostaUsuario ?? "Sem resposta";
+    }
+  
+
+}

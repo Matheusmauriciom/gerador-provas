@@ -1,0 +1,138 @@
+@page "/gerador-prova"
+@inject NavigationManager Navigation
+@inject ApplicationDbContext Context
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+
+<h3 class="mt-4">Gerador de Prova</h3>
+
+<div class="container mt-4">
+    <div class="mb-3">
+        <label for="disciplina">Disciplina:</label>
+        <select id="disciplina" @onchange="CarregarTopicos" class="form-control">
+            <option value="">Selecione a Disciplina</option>
+            @foreach (var disciplina in Enum.GetValues(typeof(DisciplinaModels)).Cast<DisciplinaModels>())
+            {
+                var disciplinaFormatada = FormatDisciplina(disciplina.ToString());
+                <option value="@disciplina">@disciplinaFormatada</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="topico">Tópico:</label>
+        <select id="topico" @bind="Topico" class="form-control">
+            <option value="">Selecione o Tópico</option>
+            @foreach (var topico in ObterTopicos(Disciplina))
+            {
+                <option value="@topico">@topico</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="quantidadeQuestoes">Quantidade de Questões:</label>
+        <input id="quantidadeQuestoes" @bind="QuantidadeQuestoes" type="number" class="form-control" />
+    </div>
+
+    <button type="button" class="btn btn-primary" @onclick="GerarProva">Gerar Prova</button>
+
+</div>
+
+@code {
+    private Random random = new Random();
+    private DisciplinaModels? Disciplina { get; set; }
+    private string Topico { get; set; }
+    private int QuantidadeQuestoes { get; set; } = 1;
+    private List<Questao> ListaDeQuestoes;
+
+    private void CarregarTopicos(ChangeEventArgs e)
+    {
+        if (Enum.TryParse(e.Value?.ToString(), out DisciplinaModels selectedDisciplina))
+        {
+            Disciplina = selectedDisciplina;
+            StateHasChanged();
+            Console.WriteLine($"Disciplina selecionada: {Disciplina}");
+            Console.WriteLine($"Topicos obtidos: {string.Join(", ", ObterTopicos(Disciplina))}");
+        }
+    }
+
+    private IEnumerable<string> ObterTopicos(DisciplinaModels? disciplina)
+    {
+        if (disciplina.HasValue)
+        {
+            return ObterTopicosDoBancoDeDados(disciplina.Value);
+        }
+        return Enumerable.Empty<string>();
+    }
+
+    private IEnumerable<string> ObterTopicosDoBancoDeDados(DisciplinaModels disciplina)
+    {
+        return Context.Questoes
+            .Where(q => q.Disciplina == disciplina)
+            .Select(q => q.Topico)
+            .Distinct()
+            .ToList();
+    }
+
+    private string FormatDisciplina(string disciplina)
+    {
+        var formattedDisciplina = disciplina.Replace("_", " ");
+
+        for (int i = 1; i < formattedDisciplina.Length; i++)
+        {
+            if (char.IsUpper(formattedDisciplina[i]))
+            {
+                formattedDisciplina = formattedDisciplina.Insert(i, " ");
+                i++;
+            }
+        }
+
+        return formattedDisciplina;
+    }
+
+    private void GerarProva()
+    {   
+        Console.WriteLine($"Disciplina: {Disciplina}");
+        Console.WriteLine($"Topico: {Topico}");
+        Console.WriteLine($"QuantidadeQuestoes: {QuantidadeQuestoes}");
+
+        if (Disciplina.HasValue && !string.IsNullOrEmpty(Topico) && QuantidadeQuestoes > 0)
+        {
+            ListaDeQuestoes = ObterQuestoes(Disciplina.Value, Topico).ToList();
+
+            if (ListaDeQuestoes.Any())
+            {
+                Console.WriteLine($"Questoes encontradas: {ListaDeQuestoes.Count}");
+
+                // Embaralhe a lista de questões antes de selecionar
+                ListaDeQuestoes = ListaDeQuestoes.OrderBy(x => Guid.NewGuid()).ToList();
+
+                // Seleciona as questões com base na quantidade desejada
+                var questoesSelecionadas = ListaDeQuestoes.Take(Math.Min(QuantidadeQuestoes, ListaDeQuestoes.Count)).ToList();
+
+                Console.WriteLine($"Questoes Selecionadas: {questoesSelecionadas.Count}");
+
+                // Passa as questões selecionadas para a página de prova
+                var parametros = $"?disciplina={Disciplina}&topico={Topico}&quantidade={QuantidadeQuestoes}";
+                NavigationManager.NavigateTo($"/prova{parametros}");
+            }
+            else
+            {
+                Console.WriteLine("A lista de questões está vazia.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Condições não atendidas. Selecione uma disciplina, um tópico e especifique a quantidade de questões.");
+        }
+    }
+
+    private List<Questao> ObterQuestoes(DisciplinaModels disciplina, string topico)
+    {
+        return Context.Questoes
+            .Where(q => q.Disciplina == disciplina && (string.IsNullOrEmpty(topico) || q.Topico == topico))
+            .ToList();
+    }
+}

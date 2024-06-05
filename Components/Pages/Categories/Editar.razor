@@ -1,0 +1,163 @@
+@page "/questoes/editar/{questaoId}"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject ApplicationDbContext Context
+@inject NavigationManager NavigationManager
+
+
+<h3>Editar Questão</h3>
+
+@if (QuestaoEditar != null)
+{
+    <div class="container mt-4">
+        <EditForm Model="@QuestaoEditar" OnSubmit="AtualizarQuestao">
+            <div class="mb-3">
+                <label for="disciplina">Disciplina:</label>
+                <select id="disciplina" @bind="@QuestaoEditar.Disciplina" class="form-control">
+                    <option value="">Selecione a Disciplina</option>
+                    @foreach (var disciplina in Enum.GetValues(typeof(DisciplinaModels)))
+                    {
+                        var disciplinaFormatada = FormatDisciplina(disciplina.ToString());
+                        <option value="@disciplina">@disciplinaFormatada</option>
+                    }
+                </select>
+            </div>
+
+
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Tópico</label>
+                    <InputText @bind-Value="@QuestaoEditar.Topico" class="form-control" />
+                </div>
+
+            <div class="mb-3">
+                <label class="form-label">Enunciado</label>
+                <textarea @bind="@QuestaoEditar.Enunciado" class="form-control" rows="5"></textarea>
+            </div>
+
+
+
+            <div class="mb-3">
+                <label class="form-label">Fonte</label>
+                <InputText @bind-Value="@QuestaoEditar.Fonte" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                @for (int i = 0; i < QuestaoEditar.Alternativas.Count; i++)
+                {
+                    var alternativa = QuestaoEditar.Alternativas[i];
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">@($"Alternativa {ObterLetraAlternativa(alternativa)}.")</span>
+                        <InputText @bind-Value="alternativa.Descricao" class="form-control" />
+                        <span class="input-group-text">
+                            <input type="checkbox" @bind="alternativa.Correta" />
+                            Correta
+                        </span>
+                    </div>
+                }
+            </div>
+
+
+            <button type="submit" class="btn btn-primary">Atualizar</button>
+            <button type="button" class="btn btn-secondary " @onclick="VoltarParaListagem">Voltar para Listagem</button>
+        </EditForm>
+    </div>
+}
+else
+{
+    <p class="mt-4">Questão não encontrada.</p>
+}
+@code {
+    [Parameter]
+    public string QuestaoId { get; set; }
+    public bool AlternativaCorreta { get; set; }
+
+
+    public Questao QuestaoEditar { get; set; }
+
+    protected override void OnInitialized()
+    {
+        CarregarQuestaoParaEdicao();
+    }
+    private char ObterLetraAlternativa(Alternativa alternativa)
+    {
+        int posicao = QuestaoEditar.Alternativas.IndexOf(alternativa);
+        return (char)('A' + posicao);
+    }
+
+    private async Task CarregarQuestaoParaEdicao()
+    {
+        try
+        {
+            if (int.TryParse(QuestaoId, out int id))
+            {
+                QuestaoEditar = await Context.Questoes
+                .Include(q => q.Alternativas)
+                .FirstOrDefaultAsync(q => q.Id == id);
+
+                if (QuestaoEditar == null)
+                {
+                    Console.WriteLine("Questão não encontrada no banco de dados.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Falha na conversão do ID para int.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar questão para edição: {ex.Message}");
+        }
+    }
+
+    private async Task AtualizarQuestao()
+    {
+        try
+        {
+            // Verifica se a questão existe
+            if (QuestaoEditar != null)
+            {
+                // Atualiza as propriedades da questão com os valores do formulário
+                foreach (var alternativa in QuestaoEditar.Alternativas)
+                {
+                    alternativa.Correta = (alternativa == QuestaoEditar.Alternativas.First(a => a.Correta));
+                }
+
+                // Salva as alterações no banco de dados
+                await Context.SaveChangesAsync();
+
+                // Redireciona para a página de detalhes
+                Navigation.NavigateTo($"/questoes/detalhes/{QuestaoEditar.Id}");
+            }
+            else
+            {
+                Console.WriteLine("Questão não encontrada.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao atualizar questão: {ex.Message}");
+        }
+    }
+
+
+    private void CancelarEdicao()
+    {
+        // Redirecione de volta para a página de detalhes
+        Navigation.NavigateTo($"/questoes/detalhes/{QuestaoEditar.Id}");
+    }
+
+    private void VoltarParaListagem()
+    {
+        // Redirecione de volta para a página de detalhes
+        Navigation.NavigateTo($"/questoes/detalhes/{QuestaoEditar.Id}");
+    }
+
+    private string FormatDisciplina(string disciplina)
+    {
+        var formattedDisciplina = disciplina.Replace("_", "");
+        formattedDisciplina = string.Concat(formattedDisciplina.Select((c, i) => i > 0 && char.IsUpper(c) ? " " + c.ToString() :
+        c.ToString()));
+        return formattedDisciplina;
+    }
+}

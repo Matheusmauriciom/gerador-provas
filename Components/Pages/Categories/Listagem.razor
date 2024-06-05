@@ -1,0 +1,203 @@
+@page "/questoes/listagem"
+@rendermode InteractiveServer
+@inject ApplicationDbContext Context
+
+
+<h3>Listagem de Questões</h3>
+
+<!-- Modal de Confirmação -->
+@if (exibirModalConfirmacao)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1" role="dialog" aria-labelledby="confirmacaoModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmacaoModalLabel">Confirmar Exclusão</h5>
+                    <button type="button" class="close" @onclick="(() => exibirModalConfirmacao = false)">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    Tem certeza de que deseja excluir esta questão?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        @onclick="(() => exibirModalConfirmacao = false)">Cancelar</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmarExclusao">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div>
+    <label for="disciplinaFiltro">Filtrar por Disciplina:</label>
+    <select id="disciplinaFiltro" name="disciplinaFiltro" @bind="DisciplinaFiltro">
+        <option value="">Todas as Disciplinas</option>
+        @foreach (var disciplina in Enum.GetValues(typeof(DisciplinaModels)))
+        {
+            var disciplinaFormatada = FormatDisciplina(disciplina.ToString());
+            <option value="@disciplina">@disciplinaFormatada</option>
+        }
+    </select>
+    <button type="button" class="btn btn-primary" @onclick="FiltrarPorDisciplina">Filtrar</button>
+</div>
+
+@if (QuestoesFiltradas != null && QuestoesFiltradas.Any())
+{
+    <p>Número de questões filtradas: @NumeroQuestoesFiltradas</p>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Disciplina</th>
+                <th>Tópico</th>
+                <th>Detalhes</th>
+                <th>Editar questão</th>
+                <th>Excluir</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var questao in QuestoesFiltradas)
+            {
+                <tr>
+                    <td>@questao.Id</td>
+                    <td>@FormatDisciplinaForTable(questao.Disciplina.ToString())</td>
+                    <td>@questao.Topico</td>
+
+
+
+                    <!-- Adicione outras colunas conforme necessário -->
+
+                    <!-- Adicione a coluna de exclusão -->
+
+
+                    <!-- Adicione um link para os detalhes da questão -->
+                    <td>
+                        <a href="/questoes/detalhes/@questao.Id.ToString()" class="btn btn-primary">Detalhes</a>
+                    </td>
+                    <td>
+                        <a href="/questoes/editar/@questao.Id.ToString()" class="btn btn-secondary">Editar Questão</a>
+                    </td>
+                      <td>
+                        <button class="btn btn-danger" @onclick="(() => ShowConfirmationModal(questao.Id))">Excluir</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <p>Nenhuma questão encontrada.</p>
+}
+
+@code {
+    public List<Questao> QuestoesFiltradas { get; set; }
+    public DisciplinaModels? DisciplinaFiltro { get; set; }
+    public int TotalQuestoesContexto { get; set; }
+    public int NumeroQuestoesFiltradas { get; set; }
+    private bool exibirModalConfirmacao = false;
+    private int questaoIdParaExcluir;
+
+    private void ShowConfirmationModal(int questaoId)
+    {
+        questaoIdParaExcluir = questaoId;
+        exibirModalConfirmacao = true;
+    }
+
+    private void ConfirmarExclusao()
+    {
+        ExcluirQuestao(questaoIdParaExcluir);
+        exibirModalConfirmacao = false;
+    }
+
+    private void FiltrarPorDisciplina()
+    {
+        try
+        {
+            Console.WriteLine($"Disciplina selecionada: {DisciplinaFiltro}");
+
+            // Verificar se há questões no contexto
+            var todasQuestoes = Context.Questoes.ToList();
+            TotalQuestoesContexto = todasQuestoes.Count;
+
+            // Filtrar as questões com base na disciplina selecionada
+            if (DisciplinaFiltro.HasValue)
+            {
+                QuestoesFiltradas = todasQuestoes.Where(q => q.Disciplina == DisciplinaFiltro).ToList();
+            }
+            else
+            {
+                // Se nenhuma disciplina selecionada, exibir todas as questões
+                QuestoesFiltradas = todasQuestoes;
+            }
+
+            NumeroQuestoesFiltradas = QuestoesFiltradas.Count;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao filtrar questões: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
+        }
+    }
+
+    private string FormatDisciplina(string disciplina)
+    {
+        var formattedDisciplina = disciplina.Replace("_", " ");
+
+        for (int i = 1; i < formattedDisciplina.Length; i++)
+        {
+            if (char.IsUpper(formattedDisciplina[i]))
+            {
+                formattedDisciplina = formattedDisciplina.Insert(i, " ");
+                i++;
+            }
+        }
+
+        return formattedDisciplina;
+    }
+
+    private string FormatDisciplinaForTable(string disciplina)
+    {
+        var formattedDisciplina = disciplina.Replace("_", "");
+
+        formattedDisciplina = string.Concat(formattedDisciplina.Select((c, i) => i > 0 && char.IsUpper(c) ? " " + c.ToString() :
+        c.ToString()));
+
+        return formattedDisciplina;
+    }
+
+    private async Task ExcluirQuestao(int questaoId)
+    {
+        try
+        {
+            // Verifique se a questão realmente existe no banco de dados
+            var questao = await Context.Questoes.FindAsync(questaoId);
+
+            if (questao != null)
+            {
+                // Remova a questão do contexto
+                Context.Questoes.Remove(questao);
+
+                // Salve as alterações no banco de dados
+                await Context.SaveChangesAsync();
+
+                // Atualize a lista de questões filtradas após a exclusão
+                FiltrarPorDisciplina();
+
+                Console.WriteLine($"Questão {questaoId} excluída com sucesso!");
+            }
+            else
+            {
+                Console.WriteLine($"Questão {questaoId} não encontrada.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao excluir a questão: {ex.Message}");
+        }
+    }
+}

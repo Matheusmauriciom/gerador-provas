@@ -1,0 +1,229 @@
+@page "/prova"
+@inject NavigationManager Navigation
+@inject ApplicationDbContext Context
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+@inject Concurso.Services.RespostasService RespostasService
+@using Microsoft.AspNetCore.WebUtilities
+@using Concurso.Services
+
+
+<h3 class="mt-4">Responder à Questão</h3>
+
+@if (QuestaoDetalhes != null)
+{
+    <div class="container mt-4">
+        <!-- Se ainda houver questões -->
+        @if (QuantidadeQuestoes > 0)
+        {
+            <!-- Se a resposta ainda não foi enviada -->
+            @if (!RespostaEnviada)
+            {
+                <div class="mb-3">
+                    <p><strong>ID da Questão:</strong> @QuestaoDetalhes.Id</p>
+                    <label for="disciplina">Disciplina:</label>
+                    <input id="disciplina" value="@QuestaoDetalhes.Disciplina" class="form-control" readonly />
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Tópico</label>
+                        <input value="@QuestaoDetalhes.Topico" class="form-control" readonly />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Enunciado</label>
+                    <textarea class="form-control" rows="5" readonly>@QuestaoDetalhes.Enunciado</textarea>
+                </div>
+
+                @if (!string.IsNullOrEmpty(QuestaoDetalhes.CaminhoImagem))
+                {
+                    <div class="mb-3">
+                        <img src="@QuestaoDetalhes.CaminhoImagem" alt="Imagem da Questão" class="img-fluid" />
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label">Fonte</label>
+                    <input value="@QuestaoDetalhes.Fonte" class="form-control" readonly />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Responda as Alternativas:</label>
+                    <div class="mb-3">
+                        @{
+                            var alternativas = QuestaoDetalhes.Alternativas;
+                        }
+
+@foreach (var alternativa in alternativas)
+{
+    <div class="input-group mb-3">
+        <div class="input-group-text">
+            <input class="form-check-input" type="radio" name="resposta" value="@alternativa.Descricao" @onchange="() => RespostaSelecionada = alternativa.Descricao" />
+        </div>
+        <input value="@($"Alternativa {ObterLetraAlternativa(alternativa)}. {alternativa.Descricao}")" class="form-control" readonly />
+    </div>
+}
+
+                    </div>
+
+                    <!-- Botão para enviar respostas -->
+                    <button type="button" class="btn btn-primary" @onclick="EnviarRespostas">Enviar Respostas</button>
+                </div>
+            }
+            else
+            {
+                <!-- Se a resposta foi enviada, mostre o botão para a próxima questão -->
+                <button type="button" class="btn btn-primary" @onclick="ProximaQuestao">Próxima Questão</button>
+            }
+
+            <!-- Botão secundário para voltar para detalhes -->
+            <button type="button" class="btn btn-secondary ml-2" @onclick="VoltarParaDetalhes">Voltar para Detalhes</button>
+        }
+        else
+        {
+            <!-- Se não houver mais questões -->
+            <p class="mt-4">Você respondeu todas as questões.</p>
+            <button type="button" class="btn btn-secondary ml-2" @onclick="VoltarParaDetalhes">Voltar para Detalhes</button>
+        }
+    </div>
+}
+else
+{
+    <p class="mt-4">Questão não encontrada.</p>
+}
+
+
+@code {
+    private List<QuestaoComResposta> QuestoesRespostasUsuario = new List<QuestaoComResposta>();
+    private Random random = new Random();
+    private List<Questao> ListaDeQuestoes;
+    private Questao QuestaoDetalhes;
+    private bool RespostaEnviada;
+    private string RespostaSelecionada;
+     private int QuantidadeQuestoes { get; set; } = 1;
+
+protected override void OnInitialized()
+{
+    base.OnInitialized();
+
+    // Obtém os parâmetros da URL
+    var uri = new Uri(NavigationManager.Uri);
+    var disciplina = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query)["disciplina"];
+    var topico = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query)["topico"];
+    var quantidadeQuestoes = int.Parse(Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query)["quantidade"]);
+
+    // Obtém as questões com base nos parâmetros passados
+    ListaDeQuestoes = ObterQuestoes(disciplina, topico);
+
+    // Garante que a quantidade de questões é a desejada
+    if (quantidadeQuestoes > 0 && quantidadeQuestoes <= ListaDeQuestoes.Count)
+    {
+        ListaDeQuestoes = ListaDeQuestoes.Take(quantidadeQuestoes).ToList();
+    }
+    else
+    {
+        // Adicione manipulação para o caso de não haver questões suficientes
+        // Pode exibir uma mensagem ao usuário ou tomar outra ação necessária
+        Console.WriteLine("Não há questões suficientes para a quantidade desejada.");
+    }
+
+    // Inicia com a primeira questão
+    ProximaQuestao();
+}
+
+private List<Questao> ObterQuestoes(string disciplina, string topico)
+{
+    var disciplinaEnum = Enum.Parse<DisciplinaModels>(disciplina);
+
+    var questoes = Context.Questoes
+        .Include(q => q.Alternativas)
+        .Where(q => q.Disciplina == disciplinaEnum && q.Topico == topico)
+        .ToList();
+
+    // Embaralhe a lista completa de questões
+    questoes = questoes.OrderBy(x => random.Next()).ToList();
+
+    return questoes;
+}
+
+private void ProximaQuestao()
+{
+    if (ListaDeQuestoes.Count > 0)
+    {
+        // Ainda há questões para serem respondidas
+        QuestaoDetalhes = ListaDeQuestoes[0];
+        ListaDeQuestoes.RemoveAt(0);
+
+        // Embaralhe a posição da resposta correta mantendo a ordem original das alternativas
+        EmbaralharRespostaCorreta();
+
+        RespostaEnviada = false;
+        RespostaSelecionada = null;
+        StateHasChanged();
+    }
+    else
+    {
+        // Todas as questões foram respondidas, navegue para a página de feedback
+        NavigationManager.NavigateTo("/feedback");
+    }
+}
+    private void EmbaralharRespostaCorreta()
+    {
+        // Encontre a resposta correta
+        var respostaCorreta = QuestaoDetalhes.Alternativas.First(a => a.Correta);
+        // Remova a resposta correta da lista
+        QuestaoDetalhes.Alternativas.Remove(respostaCorreta);
+
+        // Embaralhe as posições das alternativas restantes
+        QuestaoDetalhes.Alternativas = QuestaoDetalhes.Alternativas.OrderBy(x => random.Next()).ToList();
+
+        // Adicione a resposta correta em uma posição aleatória (mantendo a ordem original)
+        var randomIndex = random.Next(0, QuestaoDetalhes.Alternativas.Count + 1);
+        QuestaoDetalhes.Alternativas.Insert(randomIndex, respostaCorreta);
+    }
+
+private void EnviarRespostas()
+{
+    if (!string.IsNullOrEmpty(RespostaSelecionada))
+    {
+        // Lógica para processar e armazenar a resposta do usuário
+        var resposta = new QuestaoComResposta
+        {
+            Questao = QuestaoDetalhes,
+            RespostaUsuario = RespostaSelecionada,
+            RespostaCorreta = RespostaSelecionada == ObterRespostaCorreta(QuestaoDetalhes),
+        };
+
+        RespostasService.AdicionarResposta(resposta);
+
+        RespostaEnviada = true;
+        StateHasChanged();
+    }
+    else
+    {
+        // Adicione uma mensagem para informar ao usuário que uma resposta deve ser selecionada
+        // Exemplo: MostrarMensagemDeErro("Selecione uma resposta antes de enviar.");
+    }
+}
+  private string ObterRespostaCorreta(Questao questao)
+    {
+        return questao.Alternativas.FirstOrDefault(a => a.Correta)?.Descricao ?? "";
+    }
+
+
+
+    private void VoltarParaDetalhes()
+    {
+        // Lógica para voltar para a página de detalhes
+        NavigationManager.NavigateTo("/detalhes");
+    }
+
+    // Obtém a letra correspondente a uma alternativa
+    private char ObterLetraAlternativa(Alternativa alternativa)
+    {
+        int posicao = QuestaoDetalhes.Alternativas.IndexOf(alternativa);
+        return (char)('A' + posicao);
+    }
+}

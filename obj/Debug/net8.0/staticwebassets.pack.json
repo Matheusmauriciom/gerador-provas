@@ -1,0 +1,41 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\dev\\APPConcurso\\Concurso\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\Concurso.bundle.scp.css",
+      "PackagePath": "staticwebassets\\Concurso.bundle.scp.css"
+    },
+    {
+      "Id": "C:\\dev\\APPConcurso\\Concurso\\wwwroot\\app.css",
+      "PackagePath": "staticwebassets\\app.css"
+    },
+    {
+      "Id": "C:\\dev\\APPConcurso\\Concurso\\wwwroot\\bootstrap\\bootstrap.min.css",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css"
+    },
+    {
+      "Id": "C:\\dev\\APPConcurso\\Concurso\\wwwroot\\bootstrap\\bootstrap.min.css.map",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css.map"
+    },
+    {
+      "Id": "C:\\dev\\APPConcurso\\Concurso\\wwwroot\\favicon.png",
+      "PackagePath": "staticwebassets\\favicon.png"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.Concurso.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.build.Concurso.props",
+      "PackagePath": "build\\Concurso.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildMultiTargeting.Concurso.props",
+      "PackagePath": "buildMultiTargeting\\Concurso.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildTransitive.Concurso.props",
+      "PackagePath": "buildTransitive\\Concurso.props"
+    }
+  ],
+  "ElementsToRemove": []
+}
